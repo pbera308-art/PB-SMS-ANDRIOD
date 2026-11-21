@@ -11,6 +11,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -22,8 +26,9 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
 
       - name: Locate Gradle Project & Make gradlew Executable
         id: find-gradle
