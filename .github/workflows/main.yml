@@ -24,35 +24,44 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
 
       - name: Accept Android SDK Licenses
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
 
-      - name: Locate Gradle Project & Make gradlew Executable
-        id: find-gradle
+      - name: Locate Android Project Directory
+        id: find-project
         run: |
-          if [ -f "./gradlew" ]; then
-            PROJECT_DIR="."
-          else
-            GRADLEW_PATH=$(find . -maxdepth 3 -name "gradlew" | head -n 1)
-            if [ -z "$GRADLEW_PATH" ]; then
-              echo "Error: gradlew not found in repository!"
-              exit 1
-            fi
-            PROJECT_DIR=$(dirname "$GRADLEW_PATH")
+          BUILD_FILE=$(find . -maxdepth 3 \( -name "build.gradle" -o -name "build.gradle.kts" \) | head -n 1)
+          if [ -z "$BUILD_FILE" ]; then
+            echo "Error: No build.gradle or build.gradle.kts found in repository!"
+            ls -la
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$BUILD_FILE")
+          if [ "$(basename "$PROJECT_DIR")" = "app" ]; then
+            PROJECT_DIR=$(dirname "$PROJECT_DIR")
           fi
           echo "project_dir=$PROJECT_DIR" >> $GITHUB_OUTPUT
-          chmod +x "$PROJECT_DIR/gradlew"
+
+      - name: Setup Gradle (if gradlew is missing)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
       - name: Build Debug APK
-        working-directory: ${{ steps.find-gradle.outputs.project_dir }}
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        working-directory: ${{ steps.find-project.outputs.project_dir }}
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            gradle assembleDebug --no-daemon --stacktrace
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BSP-SMS-Android-APK
-          path: ${{ steps.find-gradle.outputs.project_dir }}/**/build/outputs/apk/debug/*.apk
+          path: ${{ steps.find-project.outputs.project_dir }}/**/build/outputs/apk/debug/*.apk
           retention-days: 30
